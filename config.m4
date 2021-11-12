@@ -12,6 +12,8 @@ dnl     [Include test support])])
 
 dnl Otherwise use 'enable':
 
+dnl PHP_ARG_ENABLE   添加配置选项的宏(macro) "--enable-test", 有三个值分别是yes, no, shared
+dnl 运行phpize 默认值为shared
 PHP_ARG_ENABLE([test],
   [whether to enable test support],
   [AS_HELP_STRING([--enable-test],
@@ -88,6 +90,8 @@ if test "$PHP_TEST" != "no"; then
   dnl PHP_SUBST(TEST_SHARED_LIBADD)
 
   dnl In case of no dependencies
+
+  dnl AC_DEFINE 定义一个C宏到config.h 文件中
   AC_DEFINE(HAVE_TEST, 1, [ Have test support ])
 
   PHP_NEW_EXTENSION(test, test.c, $ext_shared)
