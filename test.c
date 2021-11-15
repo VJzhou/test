@@ -16,6 +16,8 @@
 	ZEND_PARSE_PARAMETERS_END()
 #endif
 
+ZEND_DECLARE_MODULE_GLOBALS(test)
+
 /* {{{ void test_test1()
  */
 PHP_FUNCTION(test_test1) /* PHP_FUNCTION 参数是方法名称*/
@@ -54,7 +56,7 @@ PHP_FUNCTION(test_scale)
         Z_PARAM_DOUBLE(x)
     ZEND_PARSE_PARAMETERS_END();
 
-    RETURN_DOUBLE(x * 2);
+    RETURN_DOUBLE(x * TEST_G(scale));
 }
 /* }}}*/
 
@@ -71,6 +73,40 @@ PHP_RINIT_FUNCTION(test) /*回调函数(callback), 在每个请求start-up 调�
 	return SUCCESS;
 }
 /* }}} */
+
+static PHP_GINIT_FUNCTION(test)
+{
+#if defined(COMPILE_DL_BCMATH) && defined(ZTS)
+    ZEND_TSRMLS_CACHE_UPDATE();
+#endif
+    test_globals->scale = 1;
+}
+
+PHP_MINIT_FUNCTION(test){ /*扩展必须实现MINIT() callback, 参数是扩展名称,
+ * 这个function应该返回SUCCESS已便将php扩展链接到php核心开启所有方法和其他的特性.
+ * 这个方法只初始化thread-local storage cache
+ * 如果要执行某些操作和访问模块全局变量(module global variables)或者通用全局变量(common global variables), 最好代码移动到MINIT 开头
+ * MINIT callback 适合添加各种各样的扩展实体(extension entities) 像内部常量(internal constant)
+ * */
+
+#ifdef defined(ZTS) && defined(COMPLILE_DL_TEST)
+    ZEND_TSRMLS_CACHE_UPDATE();
+#endif
+
+    REGISTER_LONG_CONSTANT("TEST_SCALE_FACTOR", 2, CONST_CS | CONST_PERSISTENT); /*first argument: 名称, second: 参数值, third: 常量标记(constant flag) {
+ * CONST_CS : 常量名称大小写敏感, CONST_PERSISTENT: 固定常量(persistent constant)} */
+    /*
+     * REGISTER_NULL_CONSTANT(NAME, FLAG): CONSTANT VALUE BE NULL
+     * REGISTER_BOOL_CONSTANT(NAME, BVAL. FLAG): ANY LONG VALUE
+     * REGISTER_DOUBLE_CONSTANT(NAME, DVAL, FLAG): A DOUBLE VALUE
+     * REGISTER_STRING_CONSTANT(NAME, STR, FLAG): A ZERO TERMINATED STRING
+     * REGISTER_STRINGL_CONSTANT(NAME, STR, LEN, FLAG): A STRING (WITH LENGTH)
+     * similar REGISTER_NS_...() group of macros, follow see:
+     * https://github.com/php/php-src/blob/PHP-7.4/Zend/zend_constants.h
+     * */
+    return SUCCESS;
+}
+
 
 /* {{{ PHP_MINFO_FUNCTION
  */
@@ -113,16 +149,22 @@ zend_module_entry test_module_entry = { /*扩展主要入口结构, PHP核心从
 	STANDARD_MODULE_HEADER,
 	"test",					/* Extension name */
 	test_functions,			/* zend_function_entry 被定义的php方法列表 */
-	NULL,							/* PHP_MINIT - Module initialization */
+	PHP_MINIT(test),							/* PHP_MINIT - Module initialization */
 	NULL,							/* PHP_MSHUTDOWN - Module shutdown */
-	PHP_RINIT(test),			/* PHP_RINIT - Request initialization */
+	NULL,			/* PHP_RINIT - Request initialization */
 	NULL,							/* PHP_RSHUTDOWN - Request shutdown */
 	PHP_MINFO(test),			/* PHP_MINFO - Module info */
 	PHP_TEST_VERSION,		/* Version */
-	STANDARD_MODULE_PROPERTIES
+	PHP_MODULE_GLOBALS(test),  /* module globals*/
+	PHP_GINIT(test),           /*  PHP_GINIT – Globals initialization*/
+	NULL,                   /* PHP_GSHUTDOWN – Globals shutdown */
+	NULL,
+	STANDARD_MODULE_PROPERTIES_EX
 	/*回调发生在php启动(MINIT), php终止(MSHUTDOWN),每个请求开始(RINIT), 每个请求结束(RSHUTDOWN)和phpinfo()(MINFO)*/
 };
 /* }}} */
+
+
 /* 几个动态链接定义*/
 #ifdef COMPILE_DL_TEST
 # ifdef ZTS
