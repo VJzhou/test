@@ -16,6 +16,7 @@ ZEND_BEGIN_MODULE_GLOBALS(test)
     zend_long scale;
 ZEND_END_MODULE_GLOBALS(test)
 
+/*提供一个外部名称访问这个结构*/
 ZEND_EXTERN_MODULE_GLOBALS(test)
 
 #define TEST_G(v) ZEND_MODULE_GLOBALS_ACCESSOR(test, v)

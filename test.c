@@ -18,6 +18,21 @@
 
 ZEND_DECLARE_MODULE_GLOBALS(test)
 
+
+/*
+ * PHP_INI_ALL 表明可以在任何时候被修改
+ * (in php.ini, in per-directory configuration files and by ini_set() function during script)
+ *
+ * OnUpdateLong: common callback 设置directive value
+ * “zend_test_globals”  保存模块全局变量的结构名称
+ * test_globals 非线程安全构建下保存模块全局变量的全局变量
+ *  scale -> 全局模块全局变量名称
+ * */
+
+PHP_INI_BEGIN()
+    STD_PHP_INI_ENTRY("test.scale1", "1", PHP_INI_ALL, OnUpdateLong, scale, zend_test_globals, test_globals)
+PHP_INI_END()
+
 /* {{{ void test_test1()
  */
 PHP_FUNCTION(test_test1) /* PHP_FUNCTION 参数是方法名称*/
@@ -92,6 +107,7 @@ PHP_MINIT_FUNCTION(test){ /*扩展必须实现MINIT() callback, 参数是扩展�
 #ifdef defined(ZTS) && defined(COMPLILE_DL_TEST)
     ZEND_TSRMLS_CACHE_UPDATE();
 #endif
+    REGISTER_INI_ENTRIES();
 
     REGISTER_LONG_CONSTANT("TEST_SCALE_FACTOR", 2, CONST_CS | CONST_PERSISTENT); /*first argument: 名称, second: 参数值, third: 常量标记(constant flag) {
  * CONST_CS : 常量名称大小写敏感, CONST_PERSISTENT: 固定常量(persistent constant)} */
@@ -163,6 +179,9 @@ zend_module_entry test_module_entry = { /*扩展主要入口结构, PHP核心从
 	/*回调发生在php启动(MINIT), php终止(MSHUTDOWN),每个请求开始(RINIT), 每个请求结束(RSHUTDOWN)和phpinfo()(MINFO)*/
 };
 /* }}} */
+
+
+
 
 
 /* 几个动态链接定义*/
