@@ -66,12 +66,43 @@ PHP_FUNCTION(test_test2)
  */
 PHP_FUNCTION(test_scale)
 {
-    double x;
-    ZEND_PARSE_PARAMETERS_START(1,1)
-        Z_PARAM_DOUBLE(x)
+//    double x;
+//    ZEND_PARSE_PARAMETERS_START(1,1)
+//        Z_PARAM_DOUBLE(x)
+//    ZEND_PARSE_PARAMETERS_END();
+//
+//    RETURN_DOUBLE(x * TEST_G(scale));
+
+    zval *x;
+    zend_long factor = TEST_G(scale);
+
+    ZEND_PARSE_PARAMETERS_START(1, 2)
+        Z_PARAM_ZVAL(x)
+        Z_PARAM_OPTIONAL /*必要参数与可选参数分割*/
+        Z_PARAM_LONG(factor)
     ZEND_PARSE_PARAMETERS_END();
 
-    RETURN_DOUBLE(x * TEST_G(scale));
+    if (Z_TYPE_P(x) == IS_LONG) { /*Z_TYPE_P  返回zval 类型*/
+        RETURN_LONG(Z_LVAL_P(x) * factor); /* Z_LVAL  返回zval的long integer, 类型必须是IS_LONG*/
+    } else if (Z_TYPE_P(x) == IS_DOUBLE) {
+        RETURN_DOUBLE(Z_DVAL_P(x) * factor); /*Z_DVAL_P 返回zval的floating-point number, 类型必须是IS_DOUBLE*/
+    } else if (Z_TYPE_P(x) == IS_STRING) {
+        /* Z_STRLEN_P 返回字符串长度
+         * zend_string_safe_alloc 为zend_string分配len * factor + 0 空间,
+         * 给入一个C string(char*)和长度初始化zend_string
+         * */
+        zend_string *ret = zend_string_safe_alloc(Z_STRLEN_P(x), factor, 0, 0);
+        char* p = ZSTR_VAL(ret); /*ZSTR_VAL 返回对应C string(char*) 的指针*/
+        while (factor-- > 0) {
+            memcpy(p, Z_STRVAL_P(x), Z_STRLEN_P(x)); /*Z_STRVAL_P 返回对应的C string(char*)的指针*/
+            p += Z_STRLEN_P(x);
+        }
+        *p = '\0';
+        RETURN_STR(ret);
+    } else {
+        php_error_docref(NULL, E_WARNING, "unexpected argument type");
+        return ;
+    }
 }
 /* }}}*/
 
@@ -146,6 +177,7 @@ ZEND_END_ARG_INFO()
 ZEND_BEGIN_ARG_INFO(arginfo_test_scale, 0) /* 第二个参数被忽略,(php5 通过引用传递其余参数)每个参数
  * 被ZEND_ARG_INFO宏定义, 通过引用传递(pass by reference)获取值和参数名称*/
     ZEND_ARG_INFO(0, x)
+    ZEND_ARG_INFO(0, factor)
 ZEND_END_ARG_INFO()
 /* }}} */
 
