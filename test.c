@@ -62,6 +62,50 @@ PHP_FUNCTION(test_test2)
 }
 /* }}}*/
 
+static int do_scale(zval *return_value, zval* x, zend_long factor) {
+    if (Z_TYPE_P(x) == IS_LONG) { /*Z_TYPE_P  返回zval 类型*/
+        RETVAL_LONG(Z_LVAL_P(x) * factor); /* Z_LVAL  返回zval的long integer, 类型必须是IS_LONG*/
+    } else if (Z_TYPE_P(x) == IS_DOUBLE) {
+        RETVAL_DOUBLE(Z_DVAL_P(x) * factor); /*Z_DVAL_P 返回zval的floating-point number, 类型必须是IS_DOUBLE*/
+    } else if (Z_TYPE_P(x) == IS_STRING) {
+        /* Z_STRLEN_P 返回字符串长度
+         * zend_string_safe_alloc 为zend_string分配len * factor + 0 空间,
+         * 给入一个C string(char*)和长度初始化zend_string
+         * */
+        zend_string *ret = zend_string_safe_alloc(Z_STRLEN_P(x), factor, 0, 0);
+        char* p = ZSTR_VAL(ret); /*ZSTR_VAL 返回对应C string(char*) 的指针*/
+        while (factor-- > 0) {
+            memcpy(p, Z_STRVAL_P(x), Z_STRLEN_P(x)); /*Z_STRVAL_P 返回对应的C string(char*)的指针*/
+            p += Z_STRLEN_P(x);
+        }
+        *p = '\0';
+        RETVAL_STR(ret);
+    } else if (Z_TYPE_P(x) == IS_ARRAY) {
+        zend_array* ret = zend_new_array(zend_array_count(Z_ARR_P(x)));
+        zend_ulong idx;
+        zend_string *key;
+        zval* val, tmp;
+
+        ZEND_HASH_FOREACH_KEY_VAL(Z_ARR_P(x), idx, key, val) {
+            if (do_scale(&tmp, val, factor) != SUCCESS) {
+                zend_array_destroy(ret);
+                return FAILURE;
+            }
+            if (key) {
+                zend_hash_add(ret, key, &tmp);
+            } else {
+                zend_hash_index_add(ret, idx, &tmp);
+            }
+        } ZEND_HASH_FOREACH_END();
+        RETVAL_ARR(ret);
+    }else{
+        php_error_docref(NULL, E_WARNING, "unexpected argument type");
+        return FAILURE;
+    }
+    return SUCCESS;
+}
+
+
 /* {{{ double test_scale( double $x )
  */
 PHP_FUNCTION(test_scale)
@@ -81,28 +125,7 @@ PHP_FUNCTION(test_scale)
         Z_PARAM_OPTIONAL /*必要参数与可选参数分割*/
         Z_PARAM_LONG(factor)
     ZEND_PARSE_PARAMETERS_END();
-
-    if (Z_TYPE_P(x) == IS_LONG) { /*Z_TYPE_P  返回zval 类型*/
-        RETURN_LONG(Z_LVAL_P(x) * factor); /* Z_LVAL  返回zval的long integer, 类型必须是IS_LONG*/
-    } else if (Z_TYPE_P(x) == IS_DOUBLE) {
-        RETURN_DOUBLE(Z_DVAL_P(x) * factor); /*Z_DVAL_P 返回zval的floating-point number, 类型必须是IS_DOUBLE*/
-    } else if (Z_TYPE_P(x) == IS_STRING) {
-        /* Z_STRLEN_P 返回字符串长度
-         * zend_string_safe_alloc 为zend_string分配len * factor + 0 空间,
-         * 给入一个C string(char*)和长度初始化zend_string
-         * */
-        zend_string *ret = zend_string_safe_alloc(Z_STRLEN_P(x), factor, 0, 0);
-        char* p = ZSTR_VAL(ret); /*ZSTR_VAL 返回对应C string(char*) 的指针*/
-        while (factor-- > 0) {
-            memcpy(p, Z_STRVAL_P(x), Z_STRLEN_P(x)); /*Z_STRVAL_P 返回对应的C string(char*)的指针*/
-            p += Z_STRLEN_P(x);
-        }
-        *p = '\0';
-        RETURN_STR(ret);
-    } else {
-        php_error_docref(NULL, E_WARNING, "unexpected argument type");
-        return ;
-    }
+    do_scale(return_value, x, factor);
 }
 /* }}}*/
 
