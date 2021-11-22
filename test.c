@@ -186,6 +186,51 @@ PHP_FUNCTION(test_scale_ref) {
         do_scale_ref(x, factor);
 }
 
+static zend_class_entry *scaler_class_entry = NULL;
+#define DEFAULT_SCALE_FACTOR 2
+
+PHP_METHOD(Scaler, __construct) {
+    zend_long factor = DEFAULT_SCALE_FACTOR;
+
+    ZEND_PARSE_PARAMETERS_START(0, 1)
+        Z_PARAM_OPTIONAL
+        Z_PARAM_LONG(factor);
+    ZEND_PARSE_PARAMETERS_END();
+
+    if (ZEND_NUM_ARGS() > 0) {
+        zend_update_property_long(Z_OBJCE_P(ZEND_THIS), ZEND_THIS, "factor", sizeof("factor") -1, factor);
+    }
+}
+
+PHP_METHOD(Scaler, scale){
+    zval *x, *zv, tmp;
+    zend_long factor;
+
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_ZVAL(x)
+    ZEND_PARSE_PARAMETERS_END();
+
+    zv = zend_read_property(Z_OBJCE_P(ZEND_THIS), ZEND_THIS, "factor", sizeof("factor")-1, 0, &tmp);
+    factor = zval_get_long(zv);
+
+    do_scale_ref(x, factor);
+}
+
+ZEND_BEGIN_ARG_INFO(arginfo_scaler_construct, 0)
+ZEND_ARG_INFO(0, factor)
+ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO(arginfo_scaler_scale, 0)
+ZEND_ARG_INFO(1, x)
+ZEND_END_ARG_INFO()
+
+static const zend_function_entry scaler_functions[] = {
+        PHP_ME(Scaler, __construct, arginfo_scaler_construct, ZEND_ACC_PUBLIC)
+        PHP_ME(Scaler, scale, arginfo_scaler_scale, ZEND_ACC_PUBLIC)
+        PHP_FE_END
+};
+
+
 /* {{{ PHP_RINIT_FUNCTION
  */
 PHP_RINIT_FUNCTION(test) /*回调函数(callback), 在每个请求start-up 调用, 只初始化thread-local storage cache
@@ -217,6 +262,9 @@ PHP_MINIT_FUNCTION(test){ /*扩展必须实现MINIT() callback, 参数是扩展�
 #ifdef defined(ZTS) && defined(COMPLILE_DL_TEST)
     ZEND_TSRMLS_CACHE_UPDATE();
 #endif
+
+    zend_class_entry ce;
+
     REGISTER_INI_ENTRIES();
 
     REGISTER_LONG_CONSTANT("TEST_SCALE_FACTOR", 2, CONST_CS | CONST_PERSISTENT); /*first argument: 名称, second: 参数值, third: 常量标记(constant flag) {
@@ -230,6 +278,14 @@ PHP_MINIT_FUNCTION(test){ /*扩展必须实现MINIT() callback, 参数是扩展�
      * similar REGISTER_NS_...() group of macros, follow see:
      * https://github.com/php/php-src/blob/PHP-7.4/Zend/zend_constants.h
      * */
+
+    INIT_CLASS_ENTRY(ce, "Scaler", scaler_functions);
+    scaler_class_entry = zend_register_internal_class(&ce);
+
+    zend_declare_class_constant_long(scaler_class_entry, "DEFAULT_FACTOR", sizeof("DEFAULT_FACTOR")-1, DEFAULT_SCALE_FACTOR);
+
+    zend_declare_property_long(scaler_class_entry, "factor", sizeof("factor")-1, DEFAULT_SCALE_FACTOR, ZEND_ACC_PRIVATE);
+
     return SUCCESS;
 }
 
@@ -241,6 +297,7 @@ PHP_MINFO_FUNCTION(test) /*回调方法, 调用php的phpinfo() 方法时被调�
 	php_info_print_table_start();
 	php_info_print_table_header(2, "test support", "enabled");
 	php_info_print_table_end();
+
 }
 /* }}} */
 
@@ -276,6 +333,8 @@ static const zend_function_entry test_functions[] = { /*test_function 是所有�
 	PHP_FE_END /*terminated macro*/
 };
 /* }}} */
+
+
 
 /* {{{ test_module_entry
  */
