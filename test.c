@@ -63,6 +63,8 @@ PHP_FUNCTION(test_test2)
 /* }}}*/
 
 static int do_scale(zval *return_value, zval* x, zend_long factor) {
+
+    ZVAL_DEREF(x);
     if (Z_TYPE_P(x) == IS_LONG) { /*Z_TYPE_P  返回zval 类型*/
         RETVAL_LONG(Z_LVAL_P(x) * factor); /* Z_LVAL  返回zval的long integer, 类型必须是IS_LONG*/
     } else if (Z_TYPE_P(x) == IS_DOUBLE) {
@@ -106,6 +108,49 @@ static int do_scale(zval *return_value, zval* x, zend_long factor) {
 }
 
 
+static int do_scale_ref(zval *x, zend_long factor) {
+
+    ZVAL_DEREF(x);
+    switch (Z_TYPE_P(x)) {
+        case IS_LONG:
+            Z_LVAL_P(x) *= factor;
+            break;
+        case IS_DOUBLE:
+            Z_DVAL_P(x) *=  factor;
+            break;
+        case IS_STRING:
+            {
+                size_t len = Z_STRLEN_P(x);
+                char *p;
+                ZVAL_STR(x, zend_string_safe_realloc(Z_STR_P(x), len, factor, 0, 0));
+                p = Z_STRVAL_P(x) + len;
+                while (--factor > 0) {
+                    memcpy(p, Z_STRVAL_P(x), len);
+                    p += len;
+                }
+                *p = '\0';
+                break;
+            }
+        case IS_ARRAY:
+            {
+                zval *val;
+                SEPARATE_ARRAY(x); // perform  copy on write, 解决多个变量指向同一块内存时, 修改一个,多个都被修改
+                ZEND_HASH_FOREACH_VAL(Z_ARR_P(x), val) {
+                    if (do_scale_ref(val, factor) != SUCCESS) {
+                        return FAILURE;
+                    }
+                } ZEND_HASH_FOREACH_END();
+                break;
+            }
+        default:
+            php_error_docref(NULL, E_WARNING, "unexpected argument type");
+            return FAILURE;
+    }
+
+    return SUCCESS;
+}
+
+
 /* {{{ double test_scale( double $x )
  */
 PHP_FUNCTION(test_scale)
@@ -129,6 +174,17 @@ PHP_FUNCTION(test_scale)
 }
 /* }}}*/
 
+PHP_FUNCTION(test_scale_ref) {
+        zval *x;
+        zend_long factor = TEST_G(scale);
+
+        ZEND_PARSE_PARAMETERS_START(1, 2)
+        Z_PARAM_ZVAL(x)
+        Z_PARAM_OPTIONAL /*必要参数与可选参数分割*/
+        Z_PARAM_LONG(factor)
+        ZEND_PARSE_PARAMETERS_END();
+        do_scale_ref(x, factor);
+}
 
 /* {{{ PHP_RINIT_FUNCTION
  */
@@ -202,6 +258,12 @@ ZEND_BEGIN_ARG_INFO(arginfo_test_scale, 0) /* 第二个参数被忽略,(php5 通
     ZEND_ARG_INFO(0, x)
     ZEND_ARG_INFO(0, factor)
 ZEND_END_ARG_INFO()
+
+ZEND_BEGIN_ARG_INFO(arginfo_test_scale_ref, 0) /* 第二个参数被忽略,(php5 通过引用传递其余参数)每个参数
+ * 被ZEND_ARG_INFO宏定义, 通过引用传递(pass by reference)获取值和参数名称*/
+ZEND_ARG_INFO(1, x)
+ZEND_ARG_INFO(0, factor)
+ZEND_END_ARG_INFO()
 /* }}} */
 
 /* {{{ test_functions[]
@@ -210,6 +272,7 @@ static const zend_function_entry test_functions[] = { /*test_function 是所有�
 	PHP_FE(test_test1,		arginfo_test_test1)
 	PHP_FE(test_test2,		arginfo_test_test2)
 	PHP_FE(test_scale,		arginfo_test_scale)
+	PHP_FE(test_scale_ref,		arginfo_test_scale_ref)
 	PHP_FE_END /*terminated macro*/
 };
 /* }}} */
